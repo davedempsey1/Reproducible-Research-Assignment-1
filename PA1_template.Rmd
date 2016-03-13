@@ -1,0 +1,104 @@
+---
+title: "PA1_template"
+author: "Dave"
+date: "February 15, 2016"
+output: html_document
+---
+
+```{r,echo=TRUE}
+library(ggplot2)
+library(plyr)
+library(lattice)
+```
+
+```{r,echo=TRUE}
+unzip("repdata-data-activity.zip")
+activity <- read.csv("activity.csv")
+```
+
+Look at data headings
+
+```{r,echo=TRUE}
+head(activity)
+```
+
+```{r,echo=TRUE}
+activity$day <- weekdays(as.Date(activity$date))
+activity$DateTime<- as.POSIXct(activity$date, format="%Y-%m-%d")
+
+clean <- activity[!is.na(activity$steps),]
+
+sumTable <- aggregate(activity$steps ~ activity$date, FUN=sum, )
+colnames(sumTable)<- c("Date", "Steps")
+```
+
+Histogram of total steps taken per day
+
+```{r,echo=TRUE}
+hist(sumTable$Steps, breaks=5, xlab="Steps", main = "Total Steps per Day", echo=FALSE)
+```
+
+Mean and Median of number of steps taken per day
+
+```{r,echo=TRUE}
+mean(sumTable$Steps) #10766.19
+median(sumTable$Steps) #10765
+```
+
+Time series plot of average number of steps taken vs 5 minute intervals
+
+```{r,echo=TRUE}
+intervalTable <- ddply(clean, .(interval), summarize, Avg = mean(steps))
+
+p <- ggplot(intervalTable, aes(x=interval, y=Avg), xlab = "Interval", ylab="Average Number of Steps")
+p + geom_line()+xlab("Interval")+ylab("Average Number of Steps")+ggtitle("Average Number of Steps per Interval")
+```
+
+Max steps taken
+
+```{r,echo=TRUE}
+maxSteps <- max(intervalTable$Avg)
+
+intervalTable[intervalTable$Avg==maxSteps,1]
+
+nrow(activity[is.na(activity$steps),])
+```
+
+```{r,echo=TRUE}
+avgTable <- ddply(clean, .(interval, day), summarize, Avg = mean(steps))
+
+nadata <- activity[is.na(activity$steps),]
+
+newdata <-merge(nadata, avgTable, by=c("interval", "day"))
+
+newdata2 <- newdata[,c(6,4,1,2,5)]
+colnames(newdata2)<- c("steps", "date", "interval", "day", "DateTime")
+
+mergeData <- rbind(clean, newdata2)
+
+sumTable2 <- aggregate(mergeData$steps ~ mergeData$date, FUN=sum, )
+colnames(sumTable2)<- c("Date", "Steps")
+```
+
+```{r,echo=TRUE}
+mean(sumTable2$Steps) #10821.21
+
+median(sumTable2$Steps) #11015
+```
+
+Histogram fixed after missing values corrected
+
+```{r,echo=TRUE}
+hist(sumTable2$Steps, breaks=5, xlab="Steps", main = "Total Steps per Day with NAs Fixed", col="Black")
+hist(sumTable$Steps, breaks=5, xlab="Steps", main = "Total Steps per Day with NAs Fixed", col="Grey", add=T)
+legend("topright", c("Imputed Data", "Non-NA Data"), fill=c("black", "grey") )
+```
+
+XY-plot separating weekday and weekend
+
+```{r,echo=TRUE}
+mergeData$DayCategory <- ifelse(mergeData$day %in% c("Saturday", "Sunday"), "Weekend", "Weekday")
+intervalTable2 <- ddply(mergeData, .(interval, DayCategory), summarize, Avg = mean(steps))
+
+xyplot(Avg~interval|DayCategory, data=intervalTable2, type="l",  layout = c(1,2),main="Average Steps per Interval Based on Type of Day", ylab="Average Number of Steps", xlab="Interval")
+```
